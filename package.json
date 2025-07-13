@@ -9,7 +9,8 @@
   "scripts": {
     "test": "NODE_OPTIONS=--experimental-vm-modules jest",
     "dev": "node --watch index.js",
-    "seed": "node seed.js"
+    "seed": "node seed.js",
+    "start": "node index.js"
   },
   "repository": {
     "type": "git",
