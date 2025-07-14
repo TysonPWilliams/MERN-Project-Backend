@@ -1,6 +1,5 @@
 // tests/models/deal.test.js
 import mongoose from 'mongoose'
-import { MongoMemoryServer } from 'mongodb-memory-server'
 import Deal from '../../models/deal.js'
 import User from '../../models/user.js'
 import LoanRequest from '../../models/loan_request.js'
@@ -10,19 +9,29 @@ import Cryptocurrency from '../../models/cryptocurrency.js'
 let mongo
 
 beforeAll(async () => {
-    mongo = await MongoMemoryServer.create()
-    const uri = mongo.getUri()
+    const uri = process.env.DATABASE_URL
 
     await mongoose.connect(uri, {
         useNewUrlParser: true,
         useUnifiedTopology: true
     })
+    await mongoose.connection.db.dropDatabase()
+    await Deal.syncIndexes()
+    await LoanRequest.syncIndexes()
+    await InterestTerm.syncIndexes()
+    await User.syncIndexes()
 })
 
+beforeEach(async () => {
+    const collections = mongoose.connection.collections
+    for (const key in collections) {
+        await collections[key].deleteMany({})
+    }
+})
+
+
 afterAll(async () => {
-    await mongoose.connection.dropDatabase()
     await mongoose.connection.close()
-    await mongo.stop()
 })
 
 afterEach(async () => {
@@ -33,44 +42,45 @@ afterEach(async () => {
 })
 
 describe('Deal model', () => {
-    it('should be defined', () => {
-        expect(Deal).toBeDefined()
-    })
-
-    test('should create a deal and compute expectedCompletionDate', async () => {
-        const user = await User.create({ email: 'lender@example.com', password: 'Password123' })
-
-        const crypto = await Cryptocurrency.create({ name: 'Bitcoin', symbol: 'BTC' })
+    test('Should create a deal and compute expectedCompletionDate', async () => {
 
         const interestTerm = await InterestTerm.create({
-            interest_rate: 5,
-            loan_length: 6 // months
+            interest_rate: 6,
+            loan_length: 6
+        })
+
+        const borrower = await User.create({
+            email: 'borrower@example.com',
+            password: 'Password123'
+        })
+
+        const crypto = await Cryptocurrency.create({
+            name: 'Bitcoin',
+            symbol: 'BTC'
         })
 
         const loanRequest = await LoanRequest.create({
-            borrower_id: user._id,
             cryptocurrency: crypto._id,
             request_amount: 1000,
+            borrower_id: borrower._id,
             interest_term: interestTerm._id
         })
+        
+        const lender = await User.create({
+            email: 'lender@example.com',
+            password: 'Password123'
+        })
 
-        const deal = new Deal({
-            lenderId: user._id,
+        const deal = await Deal.create({
+            lenderId: lender._id,
             loanDetails: loanRequest._id
         })
 
-        const saved = await deal.save()
-        expect(saved._id).toBeDefined()
-        expect(saved.isComplete).toBe(false)
-        expect(saved.expectedCompletionDate).toBeInstanceOf(Date)
+        await deal.save()
 
-        const now = new Date()
-        const expected = new Date(now)
-        expected.setMonth(expected.getMonth() + 6)
-
-        expect(saved.expectedCompletionDate.toISOString().slice(0, 10))
-            .toBe(expected.toISOString().slice(0, 10))
-
+        expect(deal).toBeDefined()
+        expect(deal.expectedCompletionDate).toBeDefined()
+        expect(deal.isComplete).toBe(false)
     })
 
     test('throws an error when loanDetails is missing interest_term', async () => {

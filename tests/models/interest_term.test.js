@@ -1,12 +1,10 @@
 import mongoose from 'mongoose'
-import { MongoMemoryServer } from 'mongodb-memory-server'
 import InterestTerm from '../../models/interest_term.js'
 
 let mongo
 
 beforeAll(async () => {
-  mongo = await MongoMemoryServer.create()
-  const uri = mongo.getUri()
+  const uri = process.env.DATABASE_URL
 
   await mongoose.connect(uri, {
     useNewUrlParser: true,
@@ -17,7 +15,6 @@ beforeAll(async () => {
 afterAll(async () => {
   await mongoose.connection.dropDatabase()
   await mongoose.connection.close()
-  await mongo.stop()
 })
 
 afterEach(async () => {

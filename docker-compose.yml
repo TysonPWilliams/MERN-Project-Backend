@@ -2,21 +2,6 @@ name: BTC Lending Backend
 
 services:
 
-  api:
-    image: btclendingbackend:latest-${NODE_ENV:-development}
-    build:
-      context: .
-      args:
-        - PORT=3000
-        - NODE_ENV=development
-    env_file: .env
-    
-    environment:
-      - DATABASE_URL=mongodb://mongo:27017/btc-lending
-      - PORT=${PORT:-3000}
-      - NODE_ENV=${NODE_ENV:-development}
-    ports:
-      - "${PORT:-3000}:${PORT:-3000}"
 
   mongo:
     image: mongo
@@ -25,9 +10,31 @@ services:
       - 27017:27017
     volumes:
       - mongodb-data:/data/db
-    
+    healthcheck:
+      test: ["CMD", "mongo", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+  
+  api:
+    image: btclendingbackend:api-1.0.0-dev
+    build:
+      context: .
+      args:
+        - PORT=3000
+        - NODE_ENV=development
+    env_file: .env
+    depends_on:
+      - mongo
+    environment:
+      - DATABASE_URL=mongodb://mongo:27017/btc-lending
+      - PORT=${PORT:-3000}
+      - NODE_ENV=${NODE_ENV:-development}
+    ports:
+      - "${PORT:-3000}:${PORT:-3000}"
+
   seed:
-    image: btclendingbackend:latest-development
+    image: btclendingbackend:seed-1.0.0-dev
     build:
       context: .
       args:
@@ -38,6 +45,19 @@ services:
       - mongo
     environment:
       - DATABASE_URL=mongodb://mongo:27017/btclending
+
+  test:
+    image: btclendingbackend:test-1.0.0-dev
+    build:
+      context: .
+      target: development
+      args:
+        - NODE_ENV=test
+    command: ["npm", "run", "test"]
+    depends_on:
+      - mongo
+    environment:
+      - DATABASE_URL=mongodb://mongo:27017/test-btc-lending
 
 # Using volumes like this stores the data in a Docker-managed location
 volumes:

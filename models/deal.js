@@ -32,15 +32,17 @@ dealSchema.pre('save', async function (next) {
 
   try {
     // Populate loanDetails to access loan term and creation date
-    await this.populate({
-      path: 'loanDetails',
-      populate: {
-        path: 'interest_term',
-        model: 'InterestTerm'
-      }
-    })
-
-    const loanDetails = this.loanDetails
+    // await this.populate({
+    //   path: 'loanDetails',
+    //   populate: {
+    //     path: 'interest_term',
+    //     model: 'InterestTerm'
+    //   }
+    // }).execPopulate?.() // Optional chaining in case populate is not
+    const loanDetails = await LoanRequest
+      .findById(this.loanDetails)
+      .populate('interest_term')
+  
     if (!loanDetails || !loanDetails.interest_term) {
       return next(new Error('Loan details not found'))
     }

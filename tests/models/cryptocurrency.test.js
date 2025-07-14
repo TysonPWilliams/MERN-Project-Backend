@@ -1,14 +1,15 @@
 // tests/models/cryptocurrency.test.js
 import mongoose from 'mongoose'
-import { MongoMemoryServer } from 'mongodb-memory-server'
 import Cryptocurrency from '../../models/cryptocurrency.js' // adjust if necessary
 
 let mongo
 
 beforeAll(async () => {
-  mongo = await MongoMemoryServer.create()
-  const uri = mongo.getUri()
+  const uri = process.env.DATABASE_URL
 
+  if (!uri) {
+    throw new Error('DATABASE_URL environment variable not set')
+  }
   await mongoose.connect(uri, {
     useNewUrlParser: true,
     useUnifiedTopology: true
@@ -18,7 +19,6 @@ beforeAll(async () => {
 afterAll(async () => {
   await mongoose.connection.dropDatabase()
   await mongoose.connection.close()
-  await mongo.stop()
 })
 
 afterEach(async () => {
