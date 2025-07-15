@@ -18,12 +18,25 @@ ARG DATABASE_URL
 ENV DATABASE_URL=${DATABASE_URL}
 
 EXPOSE 3000
+
 # -----------------
 # For development
 # ------------------
 FROM build AS development
 
 CMD [ "npm", "run", "dev" ]
+
+
+# -----------------
+# For testing
+# ------------------
+FROM build AS test
+
+ENV NODE_ENV=test
+
+CMD [ "npm", "test" ]
+
+
 # ---------------
 # For production
 # ---------------

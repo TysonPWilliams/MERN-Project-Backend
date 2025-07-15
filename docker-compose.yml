@@ -73,12 +73,13 @@ services:
     image: btclendingbackend/test:1.0.0-dev
     build:
       context: .
-      target: development
+      target: test
       args:
         - NODE_ENV=test
     command: ["npm", "run", "test"]
     depends_on:
       - mongo
+      - api-dev
     environment:
       - DATABASE_URL=mongodb://mongo:27017/test-btc-lending
 

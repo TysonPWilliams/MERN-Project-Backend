@@ -196,7 +196,7 @@ cd dev1003-p2p-crypto-lending-backend
 
 2. Install dependencies:
 ```bash
-npm install
+npm install && npm install --save-dev
 ```
 
 3. Create a `.env` file in the root directory with the following variables:
