@@ -16,25 +16,48 @@ services:
       timeout: 5s
       retries: 5
   
-  api:
-    image: btclendingbackend:api-1.0.0-dev
+  #  Development API service using the "development" stage in Dockerfile
+  api-dev:
+    image: btclendingbackend/api:1.0.0-dev
     build:
       context: .
+      target: development
       args:
         - PORT=3000
         - NODE_ENV=development
+
+    # In production, secrets would be injected using GitHub Actions' encrypted secrets
     env_file: .env
     depends_on:
       - mongo
     environment:
       - DATABASE_URL=mongodb://mongo:27017/btc-lending
-      - PORT=${PORT:-3000}
-      - NODE_ENV=${NODE_ENV:-development}
+      - PORT=${DEV_PORT:-3000}
+      - NODE_ENV=development
     ports:
-      - "${PORT:-3000}:${PORT:-3000}"
+      - "${DEV_PORT:-3000}:3000"
+
+
+  api-prod:
+    image: btclendingbackend/api:1.0.0-prod
+    build:
+      context: .
+      target: production
+      args:
+        - PORT=3000
+        - NODE_ENV=production
+    env_file: .env
+    depends_on:
+      - mongo
+    environment:
+      - DATABASE_URL=mongodb://mongo:27017/btc-lending
+      - PORT=${PROD_PORT:-3000}
+      - NODE_ENV=production
+    ports:
+      - "${PROD_PORT:-3001}:3000"
 
   seed:
-    image: btclendingbackend:seed-1.0.0-dev
+    image: btclendingbackend/seed:1.0.0-dev
     build:
       context: .
       args:
@@ -44,10 +67,10 @@ services:
     depends_on:
       - mongo
     environment:
-      - DATABASE_URL=mongodb://mongo:27017/btclending
+      - DATABASE_URL=mongodb://mongo:27017/btc-lending
 
   test:
-    image: btclendingbackend:test-1.0.0-dev
+    image: btclendingbackend/test:1.0.0-dev
     build:
       context: .
       target: development
