@@ -1,4 +1,5 @@
 // tests/models/cryptocurrency.test.js
+import 'dotenv/config'
 import mongoose from 'mongoose'
 import Cryptocurrency from '../../models/cryptocurrency.js' // adjust if necessary
 
@@ -17,7 +18,6 @@ beforeAll(async () => {
 })
 
 afterAll(async () => {
-  await mongoose.connection.dropDatabase()
   await mongoose.connection.close()
 })
 
@@ -32,9 +32,7 @@ describe('Cryptocurrency model', () => {
   it('should be defined', () => {
     expect(Cryptocurrency).toBeDefined()
   })
-})
 
-describe('Cryptocurrency Model', () => {
   test('creates and saves a valid cryptocurrency', async () => {
     const validCrypto = new Cryptocurrency({
       name: 'Bitcoin',
@@ -80,5 +78,6 @@ describe('Cryptocurrency Model', () => {
     expect(err).toBeDefined()
     expect(err.errors.symbol).toBeDefined()
   })
-
 })
+
+

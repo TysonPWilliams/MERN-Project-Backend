@@ -7,7 +7,7 @@
     "doc": "docs"
   },
   "scripts": {
-    "test": "NODE_OPTIONS=--experimental-vm-modules npx jest",
+    "test": "NODE_OPTIONS=--experimental-vm-modules npx jest --detectOpenHandles",
     "dev": "node --watch index.js",
     "seed": "node seed.js",
     "start": "node index.js"

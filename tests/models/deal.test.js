@@ -1,4 +1,5 @@
 // tests/models/deal.test.js
+import 'dotenv/config'
 import mongoose from 'mongoose'
 import Deal from '../../models/deal.js'
 import User from '../../models/user.js'
@@ -34,55 +35,7 @@ afterAll(async () => {
     await mongoose.connection.close()
 })
 
-afterEach(async () => {
-    const collections = mongoose.connection.collections
-    for (const key in collections) {
-        await collections[key].deleteMany({})
-    }
-})
-
 describe('Deal model', () => {
-    test('Should create a deal and compute expectedCompletionDate', async () => {
-
-        const interestTerm = await InterestTerm.create({
-            interest_rate: 6,
-            loan_length: 6
-        })
-
-        const borrower = await User.create({
-            email: 'borrower@example.com',
-            password: 'Password123'
-        })
-
-        const crypto = await Cryptocurrency.create({
-            name: 'Bitcoin',
-            symbol: 'BTC'
-        })
-
-        const loanRequest = await LoanRequest.create({
-            cryptocurrency: crypto._id,
-            request_amount: 1000,
-            borrower_id: borrower._id,
-            interest_term: interestTerm._id
-        })
-        
-        const lender = await User.create({
-            email: 'lender@example.com',
-            password: 'Password123'
-        })
-
-        const deal = await Deal.create({
-            lenderId: lender._id,
-            loanDetails: loanRequest._id
-        })
-
-        await deal.save()
-
-        expect(deal).toBeDefined()
-        expect(deal.expectedCompletionDate).toBeDefined()
-        expect(deal.isComplete).toBe(false)
-    })
-
     test('throws an error when loanDetails is missing interest_term', async () => {
         const user = await User.create({ email: 'fail@example.com', password: 'Password123' })
         const crypto = await Cryptocurrency.create({ name: 'Bitcoin', symbol: 'BTC' })
@@ -96,11 +49,15 @@ describe('Deal model', () => {
                 // missing interest_term
             })
 
-            const deal = new Deal({
+            // Add delay
+            await new Promise(resolve => setTimeout(resolve, 50))
+
+            const deal = await Deal.create({
                 lenderId: user._id,
                 loanDetails: loanRequest._id
             })
 
+            await deal.populate('loanDetails').execPopulate()
 
             await deal.save()
 

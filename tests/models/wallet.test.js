@@ -1,4 +1,5 @@
 // tests/models/wallet.test.js
+import 'dotenv/config'
 import mongoose from 'mongoose';
 import Wallet from '../../models/wallet.js';
 import User from '../../models/user.js';
@@ -13,7 +14,6 @@ beforeAll(async () => {
 })
 
 afterAll(async () => {
-    await mongoose.connection.dropDatabase()
     await mongoose.connection.close()
 })
 
