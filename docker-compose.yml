@@ -25,8 +25,6 @@ services:
       args:
         - PORT=3000
         - NODE_ENV=development
-
-    # In production, secrets would be injected using GitHub Actions' encrypted secrets
     env_file: .env
     depends_on:
       - mongo
@@ -46,6 +44,8 @@ services:
       args:
         - PORT=3000
         - NODE_ENV=production
+    # In production, secrets would be injected using GitHub Actions' encrypted secrets.
+    # This has been done for my GitHub Workflow in the /.github/workflows
     env_file: .env
     depends_on:
       - mongo
