@@ -78,7 +78,9 @@ Start all services, including MongoDB, API (dev or prod), seeding, and testing w
 docker compose up --build
 ```
 
-To run only development API:
+> If viewing the code on VSCode, it is highly recommended to install the [Dev Containers](https://marketplace.visualstudio.com/items?itemName=ms-vscode-remote.remote-containers) extension in the Extension Tab of VSCode. If installed, you can right click on the `docker-compose.yml` file and click `Compose Up`. This will build and run all images/containers.
+
+To run only the development API:
 
 ```bash
 docker compose up --build api-dev
@@ -106,11 +108,14 @@ This executes the seed script inside a container, populating test users, cryptoc
 
 ## Running Tests
 
-Tests are run inside a container using the test image and use an in-memory MongoDB instance for isolation:
+Tests are run inside a container using the test image and test data that get's populated and then deleted as the tests run.
+
 
 ```bash
 docker compose run test
 ```
+
+> If everything is working and setup correctly, there should be 49 passed tests.
 
 ---
 

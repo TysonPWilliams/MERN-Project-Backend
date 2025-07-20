@@ -190,8 +190,8 @@ If this project were to scale, adopting a formal style guide (e.g., ESLint with 
 
 1. Clone the repository:
 ```bash
-git clone https://github.com/SatoshiFundAus/dev1003-p2p-crypto-lending-backend
-cd dev1003-p2p-crypto-lending-backend
+git clone https://github.com/TysonPWilliams/MERN-Project-Backend
+cd MERN-Project-Backend
 ```
 
 2. Install dependencies:
@@ -204,7 +204,6 @@ npm install && npm install --save-dev
 MONGODB_URI=your_mongodb_connection_string
 JWT_SECRET=your_jwt_secret
 PORT=3000
-FRONTEND_URL=your_frontend_url
 ```
 
 ***Note: If using the project in a Docker container, please reference DOCKER.md and look at the [Environment Variables](./DOCKER.md#environment-variables) section.***
