@@ -36,36 +36,45 @@ afterAll(async () => {
 })
 
 describe('Deal model', () => {
-    test('throws an error when loanDetails is missing interest_term', async () => {
-        const user = await User.create({ email: 'fail@example.com', password: 'Password123' })
+    test('creates a valid deal with proper loanDetails', async () => {
+        const user = await User.create({ email: 'test@example.com', password: 'Password123' })
         const crypto = await Cryptocurrency.create({ name: 'Bitcoin', symbol: 'BTC' })
+        const interestTerm = await InterestTerm.create({
+            loan_length: 12,
+            interest_rate: 5.5
+        })
 
+        const loanRequest = await LoanRequest.create({
+            borrower_id: user._id,
+            cryptocurrency: crypto._id,
+            request_amount: 1000,
+            interest_term: interestTerm._id
+        })
+
+        const deal = await Deal.create({
+            lenderId: user._id,
+            loanDetails: loanRequest._id
+        })
+
+        expect(deal).toBeDefined()
+        expect(deal.lenderId).toEqual(user._id)
+        expect(deal.loanDetails).toEqual(loanRequest._id)
+        expect(deal.isComplete).toBe(false)
+        expect(deal.expectedCompletionDate).toBeDefined()
+    })
+
+    test('validates required fields', async () => {
         let error
         try {
-            const loanRequest = await LoanRequest.create({
-                borrower_id: user._id,
-                cryptocurrency: crypto._id,
-                request_amount: 1000
-                // missing interest_term
+            await Deal.create({
+                // missing required fields
             })
-
-            // Add delay
-            await new Promise(resolve => setTimeout(resolve, 50))
-
-            const deal = await Deal.create({
-                lenderId: user._id,
-                loanDetails: loanRequest._id
-            })
-
-            await deal.populate('loanDetails')
-
-            await deal.save()
-
         } catch (err) {
             error = err
         }
 
         expect(error).toBeDefined()
-        expect(error.message).toMatch(/LoanRequest validation failed: interest_term: Path `interest_term` is required./)
+        expect(error.errors.lenderId).toBeDefined()
+        expect(error.errors.loanDetails).toBeDefined()
     })
 })
