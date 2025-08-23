@@ -9,10 +9,7 @@ let user, interestTerm, crypto
 
 beforeAll(async () => {
   const uri = process.env.DATABASE_URL
-  await mongoose.connect(uri, {
-    useNewUrlParser: true,
-    useUnifiedTopology: true
-  })
+  await mongoose.connect(uri)
 
   // Ensure indexes are applied fresh
   // Ensure indexes are applied fresh

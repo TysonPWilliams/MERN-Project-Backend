@@ -11,10 +11,7 @@ beforeAll(async () => {
   if (!uri) {
     throw new Error('DATABASE_URL environment variable not set')
   }
-  await mongoose.connect(uri, {
-    useNewUrlParser: true,
-    useUnifiedTopology: true
-  })
+  await mongoose.connect(uri)
 })
 
 afterAll(async () => {

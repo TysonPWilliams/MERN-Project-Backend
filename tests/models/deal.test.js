@@ -12,10 +12,7 @@ let mongo
 beforeAll(async () => {
     const uri = process.env.DATABASE_URL
 
-    await mongoose.connect(uri, {
-        useNewUrlParser: true,
-        useUnifiedTopology: true
-    })
+    await mongoose.connect(uri)
     await mongoose.connection.db.dropDatabase()
     await Deal.syncIndexes()
     await LoanRequest.syncIndexes()
@@ -57,7 +54,7 @@ describe('Deal model', () => {
                 loanDetails: loanRequest._id
             })
 
-            await deal.populate('loanDetails').execPopulate()
+            await deal.populate('loanDetails')
 
             await deal.save()
 
