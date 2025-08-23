@@ -7,11 +7,13 @@ import LoanRequest from '../../models/loan_request.js'
 import InterestTerm from '../../models/interest_term.js' // adjust if needed
 import Cryptocurrency from '../../models/cryptocurrency.js'
 
-let mongo
-
 beforeAll(async () => {
+    // Ensure clean state before connecting
+    if (mongoose.connection.readyState !== 0) {
+        await mongoose.connection.close()
+    }
+    
     const uri = process.env.DATABASE_URL
-
     await mongoose.connect(uri)
     await mongoose.connection.db.dropDatabase()
     await Deal.syncIndexes()
@@ -27,9 +29,10 @@ beforeEach(async () => {
     }
 })
 
-
 afterAll(async () => {
-    await mongoose.connection.close()
+    if (mongoose.connection.readyState !== 0) {
+        await mongoose.connection.close()
+    }
 })
 
 describe('Deal model', () => {
