@@ -43,21 +43,26 @@ jobs:
           JWT_SECRET: ${{ secrets.JWT_SECRET }}
         run: |
           docker compose -f docker-compose.yml build test
-          docker compose -f docker-compose.yml run --rm test 2>&1 | tee test-results.log
+          docker compose -f docker-compose.yml run --rm test
+      
+      - name: Copy test results from container
+        if: always()
+        run: |
+          docker compose -f docker-compose.yml run --rm -v $(pwd)/test-results:/app/test-results test || true
       
       - name: Upload test results as artifacts
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: test-results-${{ github.run_number }}
-          path: test-results.log
+          path: test-results/
           retention-days: 30
       
       - name: Publish Test Results
         if: always()
         uses: EnricoMi/publish-unit-test-result-action@v2
         with:
-          files: "test-results.log"
+          files: "test-results/junit.xml"
           comment_mode: always
           compare_to_earlier_commit: true
 
