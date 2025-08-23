@@ -3,6 +3,8 @@ export default {
   testEnvironment: 'node',
   transform: {},
   testTimeout: 10000,
+  maxWorkers: 1, // Run tests sequentially to avoid MongoDB connection conflicts
+  setupFilesAfterEnv: ['<rootDir>/tests/setup.js'],
   reporters: [
     'default',
     ['jest-junit', {
