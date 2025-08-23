@@ -43,7 +43,7 @@ jobs:
           JWT_SECRET: ${{ secrets.JWT_SECRET }}
         run: |
           docker compose -f docker-compose.yml build test
-          docker compose -f docker-compose.yml run --rm test
+          docker compose -f docker-compose.yml run --rm test 2>&1 | tee test-results.log
       
       - name: Upload test results as artifacts
         if: always()
