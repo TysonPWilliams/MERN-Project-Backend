@@ -14,6 +14,10 @@ jobs:
       docker:
         image: docker:24.0.5
         options: --privileged 
+    
+    permissions:
+      checks: write
+      pull-requests: write
 
     steps:
       - name: Checkout repository
@@ -40,7 +44,25 @@ jobs:
         run: |
           docker compose -f docker-compose.yml build test
           docker compose -f docker-compose.yml run --rm test
+      
+      - name: Upload test results as artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results-${{ github.run_number }}
+          path: test-results.log
+          retention-days: 30
+      
+      - name: Publish Test Results
+        if: always()
+        uses: EnricoMi/publish-unit-test-result-action@v2
+        with:
+          files: "test-results.log"
+          comment_mode: create
+          compare_to_earlier_commit: true
 
       - name: Clean up containers
         if: always()
         run: docker compose down -v
+
+      
