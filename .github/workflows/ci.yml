@@ -58,7 +58,7 @@ jobs:
         uses: EnricoMi/publish-unit-test-result-action@v2
         with:
           files: "test-results.log"
-          comment_mode: create
+          comment_mode: always
           compare_to_earlier_commit: true
 
       - name: Clean up containers
