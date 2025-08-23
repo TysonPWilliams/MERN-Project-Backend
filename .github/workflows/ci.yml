@@ -75,12 +75,17 @@ jobs:
         run: |
           if [ -f "test-results/junit.xml" ]; then
             # Parse test results from junit.xml
-            TESTS=$(grep -o 'tests="[0-9]*"' test-results/junit.xml | grep -o '[0-9]*' || echo "0")
-            FAILURES=$(grep -o 'failures="[0-9]*"' test-results/junit.xml | grep -o '[0-9]*' || echo "0")
-            ERRORS=$(grep -o 'errors="[0-9]*"' test-results/junit.xml | grep -o '[0-9]*' || echo "0")
+            TESTS=$(grep -o 'tests="[0-9]*"' test-results/junit.xml | head -1 | grep -o '[0-9]*' || echo "0")
+            FAILURES=$(grep -o 'failures="[0-9]*"' test-results/junit.xml | head -1 | grep -o '[0-9]*' || echo "0")
+            ERRORS=$(grep -o 'errors="[0-9]*"' test-results/junit.xml | head -1 | grep -o '[0-9]*' || echo "0")
+            
+            # Ensure variables are numeric
+            TESTS=${TESTS:-0}
+            FAILURES=${FAILURES:-0}
+            ERRORS=${ERRORS:-0}
             PASSED=$((TESTS - FAILURES - ERRORS))
             
-            if [ $FAILURES -eq 0 ] && [ $ERRORS -eq 0 ]; then
+            if [ "$FAILURES" -eq 0 ] && [ "$ERRORS" -eq 0 ]; then
               STATUS="✅ PASSED"
               COLOR="3066993"
             else
@@ -96,47 +101,52 @@ jobs:
             ERRORS="0"
           fi
           
+          # Create JSON payload
+          cat > discord_payload.json << EOF
+          {
+            "embeds": [{
+              "title": "Test Results - ${{ github.repository }}",
+              "description": "Branch: \`${{ github.ref_name }}\`\\nCommit: \`${{ github.sha }}\`",
+              "color": $COLOR,
+              "fields": [
+                {
+                  "name": "Status",
+                  "value": "$STATUS",
+                  "inline": true
+                },
+                {
+                  "name": "Tests Run",
+                  "value": "$TESTS",
+                  "inline": true
+                },
+                {
+                  "name": "Passed",
+                  "value": "$PASSED",
+                  "inline": true
+                },
+                {
+                  "name": "Failed",
+                  "value": "$FAILURES",
+                  "inline": true
+                },
+                {
+                  "name": "Errors",
+                  "value": "$ERRORS",
+                  "inline": true
+                }
+              ],
+              "timestamp": "$(date -u +%Y-%m-%dT%H:%M:%S.000Z)",
+              "footer": {
+                "text": "GitHub Actions"
+              }
+            }]
+          }
+          EOF
+          
           # Send Discord webhook
           curl -H "Content-Type: application/json" \
             -X POST \
-            -d '{
-              "embeds": [{
-                "title": "Test Results - '"${{ github.repository }}"'",
-                "description": "Branch: `'"${{ github.ref_name }}"'`\nCommit: `'"${{ github.sha }}"'`",
-                "color": '"$COLOR"',
-                "fields": [
-                  {
-                    "name": "Status",
-                    "value": "'"$STATUS"'",
-                    "inline": true
-                  },
-                  {
-                    "name": "Tests Run",
-                    "value": "'"$TESTS"'",
-                    "inline": true
-                  },
-                  {
-                    "name": "Passed",
-                    "value": "'"$PASSED"'",
-                    "inline": true
-                  },
-                  {
-                    "name": "Failed",
-                    "value": "'"$FAILURES"'",
-                    "inline": true
-                  },
-                  {
-                    "name": "Errors",
-                    "value": "'"$ERRORS"'",
-                    "inline": true
-                  }
-                ],
-                "timestamp": "'"$(date -u +%Y-%m-%dT%H:%M:%S.000Z)"'",
-                "footer": {
-                  "text": "GitHub Actions"
-                }
-              }]
-            }' \
+            -d @discord_payload.json \
             ${{ secrets.DISCORD_WEBHOOK_URL }}
 
       
