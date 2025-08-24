@@ -1,42 +1,60 @@
+# ==============================================================================
+# CONTINUOUS DEPLOYMENT WORKFLOW  
+# ==============================================================================
+# Purpose: Automated deployment to AWS EC2 with intelligent scheduling
+# Triggers: CI success, direct push, scheduled maintenance, manual override
+# Security: Business hours restrictions, test validation, emergency bypass
+# Infrastructure: AWS EC2, S3 artifact storage, SystemD service management
+# Monitoring: Discord notifications, health checks, deployment tracking
+# ==============================================================================
+
 name: Deploy Backend to AWS EC2 (CD)
 
 on:
-  # Trigger on push to main branch
+  # TRIGGER 1: Direct Push Deployment
+  # Deploys immediately when code is pushed directly to main branch
+  # Use case: Hotfixes, urgent patches during business hours
   push:
     branches: [ main ]
     
-  # Trigger after CI tests complete successfully
+  # TRIGGER 2: CI-Driven Deployment (Recommended)
+  # Deploys only after CI tests pass successfully
+  # Use case: Standard development workflow with quality gates
   workflow_run:
-    workflows: ["Run Backend Tests (CI)"]
+    workflows: ["Run Backend Tests (CI)"]  # References CI workflow by exact name
     types:
-      - completed
-    branches: [ main ]
+      - completed                          # Triggers on CI completion (success or failure)
+    branches: [ main ]                     # Only deploy from main branch
     
-  # Scheduled trigger for maintenance deployments (every Sunday at 2 AM UTC)
+  # TRIGGER 3: Scheduled Maintenance Deployment
+  # Weekly deployment during low-traffic periods
+  # Use case: Routine updates, security patches, dependency updates
   schedule:
-    - cron: '0 2 * * 0'
+    - cron: '0 2 * * 0'                   # Every Sunday at 2:00 AM UTC (off-peak hours)
     
-  # Manual trigger with input parameters for controlled deployments
+  # TRIGGER 4: Manual Deployment Control
+  # Provides operator control with safety parameters
+  # Use case: Emergency deployments, feature releases, rollbacks
   workflow_dispatch:
     inputs:
       deployment_environment:
-        description: 'Deployment Environment'
+        description: 'Target deployment environment'
         required: true
         default: 'production'
         type: choice
         options:
-          - production
-          - staging
-          - hotfix
+          - production                     # Live production environment
+          - staging                        # Pre-production testing
+          - hotfix                         # Emergency patch deployment
       skip_tests:
-        description: 'Skip test validation (emergency deployments only)'
+        description: 'Bypass CI validation (EMERGENCY USE ONLY)'
         required: false
         default: false
-        type: boolean
+        type: boolean                      # Safety flag for critical situations
       deployment_reason:
-        description: 'Reason for manual deployment'
+        description: 'Justification for manual deployment (required for audit)'
         required: true
-        type: string
+        type: string                       # Audit trail and team communication
 
 jobs:
   # Pre-deployment validation and condition checking
