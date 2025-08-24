@@ -275,26 +275,28 @@ Weekly maintenance deployment with system optimizations, security updates, and d
 #### **Maintenance Window: Sunday 02:00 UTC**
 
 ```mermaid
-timeline
-    title Weekly Maintenance Deployment
+gantt
+    title Weekly Maintenance Deployment Timeline
+    dateFormat HH:mm
+    axisFormat %H:%M
     
     section Pre-Maintenance
-        01:30 : Backup verification
-        01:45 : System health check
-        01:55 : Maintenance window start
-        
-    section Maintenance Phase  
-        02:00 : Automatic deployment trigger
-        02:05 : Enhanced backup creation
-        02:15 : Dependency updates
-        02:25 : Database optimization
-        02:35 : Security patches
-        
+    Backup Verification    :01:30, 01:45
+    System Health Check    :01:45, 01:55
+    Maintenance Start      :milestone, m1, 01:55, 0m
+    
+    section Maintenance Phase
+    Deploy Trigger         :02:00, 02:05
+    Enhanced Backup        :02:05, 02:15
+    Dependency Updates     :02:15, 02:25
+    Database Optimization  :02:25, 02:35
+    Security Patches       :02:35, 02:45
+    
     section Post-Maintenance
-        02:45 : Service restart
-        02:50 : Health verification
-        02:55 : Performance validation
-        03:00 : Maintenance window end
+    Service Restart        :02:45, 02:50
+    Health Verification    :02:50, 02:55
+    Performance Validation :02:55, 03:00
+    Maintenance Complete   :milestone, m2, 03:00, 0m
 ```
 
 #### **Scheduled Deployment Configuration**
