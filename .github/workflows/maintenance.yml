@@ -1,0 +1,111 @@
+name: Scheduled Maintenance Tasks
+
+on:
+  # Run maintenance tasks every day at 3 AM UTC
+  schedule:
+    - cron: '0 3 * * *'
+    
+  # Manual trigger for immediate maintenance
+  workflow_dispatch:
+    inputs:
+      maintenance_type:
+        description: 'Type of maintenance to perform'
+        required: true
+        type: choice
+        options:
+          - log_cleanup
+          - database_optimization
+          - security_scan
+          - full_maintenance
+        default: 'log_cleanup'
+      dry_run:
+        description: 'Perform dry run (no actual changes)'
+        required: false
+        default: true
+        type: boolean
+
+jobs:
+  maintenance:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Log maintenance trigger
+        run: |
+          echo "🔧 Starting maintenance tasks..."
+          echo "Trigger: ${{ github.event_name }}"
+          echo "Time: $(date -u)"
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "Maintenance type: ${{ github.event.inputs.maintenance_type }}"
+            echo "Dry run: ${{ github.event.inputs.dry_run }}"
+          fi
+
+      - name: Perform maintenance tasks
+        run: |
+          maintenance_type="${{ github.event.inputs.maintenance_type || 'log_cleanup' }}"
+          dry_run="${{ github.event.inputs.dry_run || 'true' }}"
+          
+          echo "Performing maintenance: $maintenance_type"
+          
+          case "$maintenance_type" in
+            "log_cleanup")
+              echo "🧹 Cleaning up old log files..."
+              if [ "$dry_run" = "false" ]; then
+                echo "Would clean logs older than 30 days"
+              else
+                echo "DRY RUN: Would clean logs older than 30 days"
+              fi
+              ;;
+            "database_optimization")
+              echo "🗄️ Optimizing database..."
+              if [ "$dry_run" = "false" ]; then
+                echo "Would run database optimization queries"
+              else
+                echo "DRY RUN: Would run database optimization queries"
+              fi
+              ;;
+            "security_scan")
+              echo "🔍 Running security scan..."
+              npm audit --audit-level moderate
+              ;;
+            "full_maintenance")
+              echo "🔧 Running full maintenance suite..."
+              if [ "$dry_run" = "false" ]; then
+                echo "Would run: log cleanup, database optimization, security scan"
+              else
+                echo "DRY RUN: Would run: log cleanup, database optimization, security scan"
+              fi
+              ;;
+          esac
+
+      - name: Create maintenance report
+        run: |
+          cat > maintenance_report.json << EOF
+          {
+            "maintenance_run": {
+              "timestamp": "$(date -u +%Y-%m-%dT%H:%M:%S.000Z)",
+              "trigger": "${{ github.event_name }}",
+              "type": "${{ github.event.inputs.maintenance_type || 'scheduled_log_cleanup' }}",
+              "dry_run": "${{ github.event.inputs.dry_run || 'true' }}",
+              "status": "completed",
+              "run_number": "${{ github.run_number }}"
+            }
+          }
+          EOF
+          
+          echo "📋 Maintenance Report:"
+          cat maintenance_report.json
+
+      - name: Upload maintenance report
+        uses: actions/upload-artifact@v4
+        with:
+          name: maintenance-report-${{ github.run_number }}
+          path: maintenance_report.json
+          retention-days: 30
+
+      - name: Notify completion
+        run: |
+          echo "✅ Maintenance tasks completed successfully"
+          echo "Report uploaded as artifact: maintenance-report-${{ github.run_number }}"

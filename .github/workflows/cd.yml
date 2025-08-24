@@ -1,18 +1,124 @@
 name: Deploy Backend to AWS EC2 (CD)
 
 on:
+  # Trigger on push to main branch
   push:
     branches: [ main ]
+    
+  # Trigger after CI tests complete successfully
   workflow_run:
     workflows: ["Run Backend Tests (CI)"]
     types:
       - completed
     branches: [ main ]
+    
+  # Scheduled trigger for maintenance deployments (every Sunday at 2 AM UTC)
+  schedule:
+    - cron: '0 2 * * 0'
+    
+  # Manual trigger with input parameters for controlled deployments
+  workflow_dispatch:
+    inputs:
+      deployment_environment:
+        description: 'Deployment Environment'
+        required: true
+        default: 'production'
+        type: choice
+        options:
+          - production
+          - staging
+          - hotfix
+      skip_tests:
+        description: 'Skip test validation (emergency deployments only)'
+        required: false
+        default: false
+        type: boolean
+      deployment_reason:
+        description: 'Reason for manual deployment'
+        required: true
+        type: string
 
 jobs:
+  # Pre-deployment validation and condition checking
+  pre-deploy-checks:
+    runs-on: ubuntu-latest
+    outputs:
+      should_deploy: ${{ steps.check-conditions.outputs.should_deploy }}
+      deployment_type: ${{ steps.check-conditions.outputs.deployment_type }}
+    steps:
+      - name: Check deployment conditions
+        id: check-conditions
+        run: |
+          # Get current time in different timezones for business hours check
+          utc_hour=$(date -u +%H)
+          utc_day=$(date -u +%u)
+          
+          echo "Current UTC hour: $utc_hour"
+          echo "Current UTC day: $utc_day (1=Monday, 7=Sunday)"
+          
+          # Business hours check (9 AM - 6 PM UTC, Monday-Friday)
+          business_hours=false
+          if [ $utc_day -ge 1 ] && [ $utc_day -le 5 ] && [ $utc_hour -ge 9 ] && [ $utc_hour -le 18 ]; then
+            business_hours=true
+            echo "Currently within business hours"
+          else
+            echo "Currently outside business hours"
+          fi
+          
+          # Determine if deployment should proceed based on trigger type
+          should_deploy=false
+          deployment_type="none"
+          
+          # Check different trigger scenarios
+          if [ "${{ github.event_name }}" = "workflow_run" ]; then
+            if [ "${{ github.event.workflow_run.conclusion }}" = "success" ]; then
+              if [ "$business_hours" = "true" ]; then
+                should_deploy=true
+                deployment_type="automated_ci"
+                echo "✅ Automated deployment: CI tests passed AND within business hours"
+              else
+                echo "❌ Skipping automated deployment: Outside business hours"
+              fi
+            else
+              echo "❌ Skipping deployment: CI tests failed"
+            fi
+          elif [ "${{ github.event_name }}" = "push" ]; then
+            if [ "$business_hours" = "true" ]; then
+              should_deploy=true
+              deployment_type="direct_push"
+              echo "✅ Direct push deployment: Within business hours"
+            else
+              echo "❌ Skipping push deployment: Outside business hours"
+            fi
+          elif [ "${{ github.event_name }}" = "schedule" ]; then
+            should_deploy=true
+            deployment_type="scheduled_maintenance"
+            echo "✅ Scheduled maintenance deployment"
+          elif [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            if [ "${{ github.event.inputs.skip_tests }}" = "true" ]; then
+              should_deploy=true
+              deployment_type="emergency_manual"
+              echo "✅ Emergency manual deployment (tests skipped)"
+            else
+              should_deploy=true
+              deployment_type="manual"
+              echo "✅ Manual deployment requested"
+            fi
+          fi
+          
+          echo "should_deploy=$should_deploy" >> $GITHUB_OUTPUT
+          echo "deployment_type=$deployment_type" >> $GITHUB_OUTPUT
+          
+          echo "Final decision: should_deploy=$should_deploy, deployment_type=$deployment_type"
+
   deploy:
     runs-on: ubuntu-latest
-    if: github.event.workflow_run.conclusion == 'success' || github.event_name == 'push'
+    needs: pre-deploy-checks
+    if: needs.pre-deploy-checks.outputs.should_deploy == 'true'
+    
+    environment: 
+      name: ${{ github.event.inputs.deployment_environment || 'production' }}
+      url: http://${{ secrets.EC2_HOST }}:${{ secrets.PROD_PORT }}
     
     steps:
       - name: Checkout repository
@@ -132,11 +238,44 @@ jobs:
       - name: Notify Discord on success
         if: success()
         run: |
+          # Determine deployment context for notification
+          deployment_env="${{ github.event.inputs.deployment_environment || 'production' }}"
+          trigger_type="${{ github.event_name }}"
+          deployment_type="${{ needs.pre-deploy-checks.outputs.deployment_type }}"
+          
+          # Set appropriate emoji and description based on deployment type
+          case "$deployment_type" in
+            "automated_ci")
+              emoji="🤖"
+              description="Automated deployment triggered by CI success"
+              ;;
+            "direct_push")
+              emoji="⚡"
+              description="Direct push deployment to main branch"
+              ;;
+            "scheduled_maintenance")
+              emoji="🔧"
+              description="Scheduled maintenance deployment"
+              ;;
+            "manual")
+              emoji="👤"
+              description="Manual deployment: ${{ github.event.inputs.deployment_reason || 'No reason provided' }}"
+              ;;
+            "emergency_manual")
+              emoji="🚨"
+              description="EMERGENCY deployment (tests skipped): ${{ github.event.inputs.deployment_reason || 'No reason provided' }}"
+              ;;
+            *)
+              emoji="🚀"
+              description="Backend deployed to AWS EC2"
+              ;;
+          esac
+          
           cat > discord_payload.json << EOF
           {
             "embeds": [{
-              "title": "🚀 Deployment Successful",
-              "description": "Backend deployed to AWS EC2",
+              "title": "$emoji Deployment Successful",
+              "description": "$description",
               "color": 3066993,
               "fields": [
                 {
@@ -145,24 +284,39 @@ jobs:
                   "inline": true
                 },
                 {
+                  "name": "Environment",
+                  "value": "$deployment_env",
+                  "inline": true
+                },
+                {
+                  "name": "Trigger Type",
+                  "value": "$trigger_type",
+                  "inline": true
+                },
+                {
                   "name": "Branch",
                   "value": "${{ github.ref_name }}",
                   "inline": true
                 },
                 {
-                  "name": "Commit",
-                  "value": "\`${{ github.sha }}\`",
-                  "inline": false
+                  "name": "Deployment Type",
+                  "value": "$deployment_type",
+                  "inline": true
                 },
                 {
-                  "name": "Environment",
-                  "value": "Production",
+                  "name": "Actor",
+                  "value": "${{ github.actor }}",
                   "inline": true
+                },
+                {
+                  "name": "Commit",
+                  "value": "[\`${GITHUB_SHA:0:7}\`](https://github.com/${{ github.repository }}/commit/${{ github.sha }})",
+                  "inline": false
                 }
               ],
               "timestamp": "$(date -u +%Y-%m-%dT%H:%M:%S.000Z)",
               "footer": {
-                "text": "GitHub Actions CD"
+                "text": "GitHub Actions CD • Run #${{ github.run_number }}"
               }
             }]
           }
