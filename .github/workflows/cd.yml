@@ -1,0 +1,227 @@
+name: Deploy Backend to AWS EC2 (CD)
+
+on:
+  push:
+    branches: [ main ]
+  workflow_run:
+    workflows: ["Run Backend Tests (CI)"]
+    types:
+      - completed
+    branches: [ main ]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    if: github.event.workflow_run.conclusion == 'success' || github.event_name == 'push'
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci --only=production
+
+      - name: Create deployment package
+        run: |
+          mkdir -p deployment
+          cp -r . deployment/
+          cd deployment
+          rm -rf node_modules .git .github tests
+          npm ci --only=production
+          tar -czf ../deployment.tar.gz .
+          cd ..
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Upload deployment package to S3
+        run: |
+          aws s3 cp deployment.tar.gz s3://${{ secrets.S3_BUCKET_NAME }}/deployments/backend-${{ github.sha }}.tar.gz
+
+      - name: Deploy to EC2
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USERNAME }}
+          key: ${{ secrets.EC2_PRIVATE_KEY }}
+          port: ${{ secrets.EC2_PORT }}
+          script: |
+            # Set deployment variables
+            APP_DIR="/home/${{ secrets.EC2_USERNAME }}/app"
+            BACKUP_DIR="/home/${{ secrets.EC2_USERNAME }}/backups"
+            SERVICE_NAME="backend-app"
+            
+            # Create directories if they don't exist
+            mkdir -p $APP_DIR $BACKUP_DIR
+            
+            # Stop the application service
+            if sudo systemctl is-active --quiet $SERVICE_NAME; then
+              sudo systemctl stop $SERVICE_NAME
+            fi
+            
+            # Create backup of current deployment
+            if [ -d "$APP_DIR" ] && [ "$(ls -A $APP_DIR)" ]; then
+              tar -czf "$BACKUP_DIR/backup-$(date +%Y%m%d-%H%M%S).tar.gz" -C "$APP_DIR" .
+              # Keep only last 5 backups
+              ls -t "$BACKUP_DIR"/backup-*.tar.gz | tail -n +6 | xargs -r rm
+            fi
+            
+            # Download and extract new deployment
+            cd /tmp
+            aws s3 cp s3://${{ secrets.S3_BUCKET_NAME }}/deployments/backend-${{ github.sha }}.tar.gz deployment.tar.gz
+            
+            # Clear app directory and extract new code
+            rm -rf $APP_DIR/*
+            tar -xzf deployment.tar.gz -C $APP_DIR
+            
+            # Set proper permissions
+            sudo chown -R ${{ secrets.EC2_USERNAME }}:${{ secrets.EC2_USERNAME }} $APP_DIR
+            
+            # Create production environment file
+            cat > $APP_DIR/.env << EOF
+            NODE_ENV=production
+            PORT=${{ secrets.PROD_PORT }}
+            DATABASE_URL=${{ secrets.PROD_DATABASE_URL }}
+            JWT_SECRET=${{ secrets.JWT_SECRET }}
+            CORS_ORIGIN=${{ secrets.CORS_ORIGIN }}
+            EOF
+            
+            # Set secure permissions on .env file
+            chmod 600 $APP_DIR/.env
+            
+            # Install/update Node.js dependencies
+            cd $APP_DIR
+            npm ci --only=production
+            
+            # Start the application service
+            sudo systemctl start $SERVICE_NAME
+            sudo systemctl enable $SERVICE_NAME
+            
+            # Wait a moment and check if service started successfully
+            sleep 5
+            if sudo systemctl is-active --quiet $SERVICE_NAME; then
+              echo "Deployment successful - service is running"
+            else
+              echo "Deployment failed - service is not running"
+              sudo journalctl -u $SERVICE_NAME --no-pager -n 20
+              exit 1
+            fi
+
+      - name: Health check
+        run: |
+          # Wait for application to be ready
+          sleep 10
+          
+          # Perform health check
+          response=$(curl -s -o /dev/null -w "%{http_code}" http://${{ secrets.EC2_HOST }}:${{ secrets.PROD_PORT }}/api/health || echo "000")
+          
+          if [ "$response" = "200" ]; then
+            echo "Health check passed - application is responding"
+          else
+            echo "Health check failed - received HTTP $response"
+            exit 1
+          fi
+
+      - name: Cleanup
+        if: always()
+        run: |
+          rm -f deployment.tar.gz
+          rm -rf deployment/
+
+      - name: Notify Discord on success
+        if: success()
+        run: |
+          cat > discord_payload.json << EOF
+          {
+            "embeds": [{
+              "title": "🚀 Deployment Successful",
+              "description": "Backend deployed to AWS EC2",
+              "color": 3066993,
+              "fields": [
+                {
+                  "name": "Repository",
+                  "value": "${{ github.repository }}",
+                  "inline": true
+                },
+                {
+                  "name": "Branch",
+                  "value": "${{ github.ref_name }}",
+                  "inline": true
+                },
+                {
+                  "name": "Commit",
+                  "value": "\`${{ github.sha }}\`",
+                  "inline": false
+                },
+                {
+                  "name": "Environment",
+                  "value": "Production",
+                  "inline": true
+                }
+              ],
+              "timestamp": "$(date -u +%Y-%m-%dT%H:%M:%S.000Z)",
+              "footer": {
+                "text": "GitHub Actions CD"
+              }
+            }]
+          }
+          EOF
+          
+          curl -H "Content-Type: application/json" \
+            -X POST \
+            -d @discord_payload.json \
+            ${{ secrets.DISCORD_WEBHOOK_URL }}
+
+      - name: Notify Discord on failure
+        if: failure()
+        run: |
+          cat > discord_payload.json << EOF
+          {
+            "embeds": [{
+              "title": "❌ Deployment Failed",
+              "description": "Backend deployment to AWS EC2 failed",
+              "color": 15158332,
+              "fields": [
+                {
+                  "name": "Repository",
+                  "value": "${{ github.repository }}",
+                  "inline": true
+                },
+                {
+                  "name": "Branch",
+                  "value": "${{ github.ref_name }}",
+                  "inline": true
+                },
+                {
+                  "name": "Commit",
+                  "value": "\`${{ github.sha }}\`",
+                  "inline": false
+                },
+                {
+                  "name": "Environment",
+                  "value": "Production",
+                  "inline": true
+                }
+              ],
+              "timestamp": "$(date -u +%Y-%m-%dT%H:%M:%S.000Z)",
+              "footer": {
+                "text": "GitHub Actions CD"
+              }
+            }]
+          }
+          EOF
+          
+          curl -H "Content-Type: application/json" \
+            -X POST \
+            -d @discord_payload.json \
+            ${{ secrets.DISCORD_WEBHOOK_URL }}

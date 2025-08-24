@@ -1,0 +1,21 @@
+[Unit]
+Description=Backend API Service
+After=network.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=ubuntu
+Group=ubuntu
+WorkingDirectory=/home/ubuntu/app
+Environment=NODE_ENV=production
+EnvironmentFile=/home/ubuntu/app/.env
+ExecStart=/usr/bin/node index.js
+Restart=on-failure
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=backend-app
+
+[Install]
+WantedBy=multi-user.target
