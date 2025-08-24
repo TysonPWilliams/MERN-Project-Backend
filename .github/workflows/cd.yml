@@ -116,9 +116,7 @@ jobs:
     needs: pre-deploy-checks
     if: needs.pre-deploy-checks.outputs.should_deploy == 'true'
     
-    environment: 
-      name: ${{ github.event.inputs.deployment_environment || 'production' }}
-      url: http://${{ secrets.EC2_HOST }}:${{ secrets.PROD_PORT }}
+    environment: ${{ github.event.inputs.deployment_environment || 'production' }}
     
     steps:
       - name: Checkout repository
